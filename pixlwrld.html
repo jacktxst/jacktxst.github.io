@@ -124,10 +124,16 @@ function init() {
         document.body.appendChild(btn);
     }
 
-    button("w","w",[32,0]);
-    button("a","a",[0,32]);
-    button("d","d",[64,32]);
-    button("s","s",[32,64]);
+    button("w","w",[1,0]);
+    button("a","a",[0,1]);
+    button("d","d",[2,1]);
+    button("s","s",[1,2]);
+	button("Enter","Enter",[1,3]);
+
+	for (let btn of document.getElementsByTagName("button")) {
+		btn.offset[0] *= 40;
+		btn.offset[1] *= 40;
+	}
 
     reposButtons();
 
