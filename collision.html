@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>CSS Template</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="docs.css"/>
+</head>
+<body>
+
+<header>
+  <h2>docs: collision</h2>
+</header>
+
+<section class="main-container">
+  <!-- Left Sidebar -->
+  <aside class="left-sidebar">
+    <div class="sidebar-section">
+      <h3>Navigation</h3>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="entities.html">Entities</a></li>
+        <li><a href="commands.html">Commands</a></li>
+        <li><a href="collision.html">Collision</a></li>
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>Collision Topics</h3>
+      <ul>
+        <li><a href="#noclip-command">Noclip Command</a></li>
+        <li><a href="#collision-functions">Collision Functions</a></li>
+        <li><a href="#tile-collision">Tile Collision</a></li>
+        <li><a href="#world-bounds">World Bounds</a></li>
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>Functions</h3>
+      <ul>
+        <li><a href="#aabbcheck">aabbCheck()</a></li>
+        <li><a href="#aabbworld">aabbWorld()</a></li>
+        <li><a href="#info-invis">.info invis</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Main Article Content -->
+  <article class="main-content">
+    <h1>Collision System</h1>
+    <p>A brief description of all features related to collision detection and handling in the engine.</p>
+    
+    <h2 id="noclip-command">Noclip Command</h2>
+    <p>The <code>.noclip</code> command toggles collision for the player.</p>
+    <ul>
+      <li><code>.noclip</code> - Toggle collision on/off</li>
+      <li><code>.noclip 0</code> - Explicitly disable collision</li>
+      <li><code>.noclip 1</code> - Explicitly enable collision</li>
+    </ul>
+    <p>When out of bounds, you can walk back in bounds.</p>
+    
+    <h2 id="tile-collision">Tile Collision</h2>
+    <p>You should be able to run a command that sets the collision mode of a certain tile ID. Currently the engine just stores a hardcoded list of tile IDs which act like full-block walls. The engine also allows for collision to be enabled and disabled on a layer-per-layer basis, meaning that some layers of the map can include wall type blocks without preventing the player's movement. This feature is not yet accesible via commands.</p>
+    <h2>Trigger Entity</h2>
+    <p>The <a href="ents/trigger.html">trigger entity</a> is used to detect whenever the player enters a region. It can run a <a href="commands.html">command</a> whenever the player enters. Very useful!
+    <h2 id="world-bounds">World Bounds</h2>
+    <p>The collision system handles world boundaries to prevent entities from moving outside the playable area.</p>
+    
+    <h2 id="info-invis">Info Invisibility</h2>
+    <p>The <code>.info invis [0|1]</code> command controls visibility of collision information in the debug display.</p>
+    <ul>
+      <li><code>.info invis 0</code> - Show collision info</li>
+      <li><code>.info invis 1</code> - Hide collision info</li>
+    </ul>
+  </article>
+
+  <!-- Right Sidebar -->
+  <aside class="right-sidebar">
+    <div class="sidebar-section">
+      <h3>Quick Reference</h3>
+      <ul>
+        <li><a href="#noclip-command">.noclip</a></li>
+        <li><a href="#aabbcheck">aabbCheck()</a></li>
+        <li><a href="#aabbworld">aabbWorld()</a></li>
+        <li><a href="#info-invis">.info invis</a></li>
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>Collision Types</h3>
+      <ul>
+        <li>Player Collision</li>
+        <li>Entity Collision</li>
+        <li>Tile Collision</li>
+        <li>World Bounds</li>
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>Related Topics</h3>
+      <ul>
+        <li><a href="entities.html">Entity System</a></li>
+        <li><a href="commands.html">Command System</a></li>
+        <li><a href="#">Physics Engine</a></li>
+        <li><a href="#">Debug Tools</a></li>
+      </ul>
+    </div>
+  </aside>
+</section>
+
+<footer>
+  <p>Footer</p>
+</footer>
+
+</body>
+</html>
+

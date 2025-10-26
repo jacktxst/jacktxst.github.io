@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>entities - pixlwrldmaker docs</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="docs.css"/>
+</head>
+<body>
+
+<header>
+  <h2>Entities</h2>
+</header>
+
+<section class="main-container">
+  <!-- Left Sidebar -->
+  <aside class="left-sidebar">
+    <div class="sidebar-section">
+      <h3>Navigation</h3>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="entities.html">Entities</a></li>
+        <li><a href="commands.html">Commands</a></li>
+        <li><a href="collision.html">Collision</a></li>
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>Entity Types</h3>
+      <ul>
+        <li><a href="ents/npc.html">NPC</a></li>
+        <li><a href="ents/interact.html">Interact</a></li>
+        <li><a href="ents/trigger.html">Trigger</a></li>
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>Entity Commands</h3>
+      <ul>
+        <li><a href="#creating-entities">Creating Entities</a></li>
+        <li><a href="#focused-entity">Focused Entity</a></li>
+        <li><a href="#modifying-entities">Modifying Entities</a></li>
+        <li><a href="#deleting-entities">Deleting Entities</a></li>
+        <li><a href="#examining-entities">Examining Entities</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Main Article Content -->
+  <article class="main-content">
+    <h1>Entities</h1>
+    <p>Entities are special Javascript objects which are entries of the <code>Entities</code> array.
+      The engine includes a pre-defined set of entity types. A developer can add
+      extra entity types by modifying the engine code, but pixlwrld maker strives
+      to have enough entity types available to serve most needs.
+
+    <h2 id="creating-entities">Creating Entities</h2>
+      <code>.ent create &lttype&gt &ltarg(s)...&gt</code>
+    <p>This command creates an entity and adds it to the global <code>Entities</code> list for <code>.process()</code>ing and <code>.draw()</code>ing.
+      It will also switch the focus to that new entity so that further <code>.ent</code> commands such as <code>.ent mod</code> will refer to the new entity.</p>
+    <p> Each entity type has a set of required arguments that must be passed to the command.
+      In addition to these required fields, each entity type has a set of optional fields.
+      Including these fields in the command is optional. Each optional field has a default value
+      defined by the entity type which it will be initialized to if not specified.
+       </p>
+    <code>.ent create npc 4 10 10 16 16 visible false</code>
+    <p>The first 5 fields (starting with "4") are the required arguments to create an npc.
+      After we've passed those arguments we give the name of another property "visible" and it's value "false".
+      You can pass as many extra arguments as you'd like to.
+      Attempting to modify a field that does not exist in that entity type
+      or attempting to set a field to an incorrect data type will cause
+      nothing to happen. You should not be able to break the program this way.
+      </p>
+    
+    <h2 id="focused-entity">"Focused" Entity</h2>
+    <code>.ent focus &ltid&gt</code> selects an entity from the <code>Entities</code> list.
+    Besides <code>.ent create</code>, all the <code>.ent</code> commands operate on the focused entity.
+    
+    <h2 id="modifying-entities">Modifying Entities</h2>
+    <code>.ent mod &ltargs...&gt</code> This command can be used to modify the properties of the currently focused entity.
+    You can modify as many properties as you'd like at one time with this command. e.g. <code>.ent mod visible true enabled false</code>
+    
+    <h2 id="deleting-entities">Deleting Entities</h2>
+    <code>.ent delete</code> removes an entity from the Entities list and shifts subsequent entries in the list to fill the gap.
+    
+    <h2 id="examining-entities">Examining Entities</h2>
+    <p>Commands for examining entity properties and states will be documented here.</p>
+
+    <h2>List of Entity Types</h2>
+    <p>You may add your own entities if you're willing to write in JavaScript,
+      but the engine should include enough entity types for most purposes.
+      More info on adding your own entity types in the next section.</p>
+    <ul>
+      <li><a href="ents/npc.html">NPC</a></li>
+      <li><a href="ents/interact.html">Interact</a></li>
+      <li><a href="ents/trigger.html">Trigger</a></li>
+    </ul>
+    
+
+  </article>
+
+  <!-- Right Sidebar -->
+  <aside class="right-sidebar">
+    <div class="sidebar-section">
+    </div>
+  </aside>
+</section>
+
+<footer>
+  <p>Footer</p>
+</footer>
+
+</body>
+</html>
+

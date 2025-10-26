@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>CSS Template</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="docs.css"/>
+</head>
+<body>
+<header>
+	<h2>Commands</h2>
+</header>
+<section class="main-container">
+  <aside class="left-sidebar">
+    <div class="sidebar-section">
+      <h3>Navigation</h3>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="entities.html">Entities</a></li>
+        <li><a href="commands.html">Commands</a></li>
+        <li><a href="collision.html">Collision</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <h3>Command Categories</h3>
+      <ul>
+        <li><a href="#implemented-commands">Implemented Commands</a></li>
+        <li><a href="#planned-commands">Planned Commands</a></li>
+        <li><a href="#script-commands">Script Commands</a></li>
+        <li><a href="#dialog-commands">Dialog Commands</a></li>
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>Scripting</h3>
+      <ul>
+        <li><a href="#command-interpreter">CommandInterpreter</a></li>
+        <li><a href="#script-format">Script Format</a></li>
+        <li><a href="#export-commands">Export Commands</a></li>
+      </ul>
+    </div>
+  </aside>
+  <article class="main-content">
+    <h1>Commands and Scripting</h1>
+    <p>
+      The engine has a command / scripting system.
+      The user/developer can run commands in-game by typing them into the developer console.
+      A series of newline separated commands can be stored by the engine a script and can be called
+      at any time with the .exec command.
+      Commands are intended to be used to edit the game's content and aid in debugging.
+      They also allow entities and events in the game to trigger scripted sequences.
+    </p>
+    
+    <h2 id="command-interpreter">CommandInterpreter</h2>
+    <p>The CommandInterpreter object handles command execution with the following methods:</p>
+    <ul>
+      <li><code>execute()</code> - Execute a single command</li>
+      <li><code>executeScript()</code> - Execute a string containing multiple newline-separated commands</li>
+    </ul>
+    
+    <h2 id="script-format">Command Format</h2>
+    <p>Commands follow this format:</p>
+    <code>.command name "string argument with spaces" 1 2.3 "2" stringwithoutspaces true</code>
+    <p>Lines starting with hashtag (#) are ignored and treated as comments.</p>
+    
+    <h2 id="implemented-commands">Currently Implemented Commands</h2>
+    <h3>Script Commands</h3>
+    <ul>
+      <li>.list scripts</li>
+      <li>.exportjs scripts</li>
+      <li>.delete script</li>
+      <li><code>.edit &ltscript name&gt</code> - creates a new script or edits an existing script. After running, any lines encountered will not be executed as commands but will be added to the script instead. When .end is encountered, further commands will be executed and not added to the script.</li>
+      <li><code>.editor &ltscript name&gt</code></li>
+      <li><code>.db s &ltscript name&gt</code></li>
+      <li><code>.end</code> - special command that terminates script editing</li>
+      <li><code>.exec &ltscript name&gt</code> - executes the script</li>
+      <li><code>.print</code> - print a message to the javascript console, useful for testing</li>
+    </ul>
+    <h3>Player Commands</h3>
+    <ul>
+      <li><code>.tp &ltx&gt &lty&gt</code> - brings the player to these coordinates</li>
+      <li><code>.canmove &lt0|1&gt</code> - prevents or allows the player to move</li>
+      <li><code>.invis &lt0|1&gt</code> - brings the player to these coordinates</li>
+      <li><code>.allow &ltaction&gt</code> - allow the action to have an effect. all actions are allowed by default</li>
+      <li><code>.prevent &ltaction&gt</code> - stop the action from having any effect</li>
+      <li><code>.noclip &ltaction&gt</code> - stop the action from having any effect</li>
+      <li><code>.pos &ltaction&gt</code> - stop the action from having any effect</li>
+      <li><code>.mpos &ltaction&gt</code> - stop the action from having any effect</li>
+
+    </ul>
+    <h3>Entity Commands</h3>
+    <ul>
+      <li>.list ents</li>
+      <li><code>.ent create &ltscript name&gt</code></li>
+      <li><code>.ent mod &ltscript name&gt</code></li>
+      <li><code>.ent focus &ltscript name&gt</code></li>
+      <li><code>.ent delete &ltscript name&gt</code></li>
+      <li><code>.export ents &ltscript name&gt</code></li>
+
+    </ul>
+    <h3>Editor / Brush Commands</h3>
+    <ul>
+      <li><code>.1</code> - set marker coordinate 1 to wherever your mouse is </li>
+      <li><code>.2</code> - set marker coordinate 2 to wherever your mouse is</li>
+      <li><code>.r</code> - rotate the brush</li>
+      <li><code>.f</code> - fill the square region defined by coordinate markers 1 and 2 with the currently selected editor brush tile ID. coord 1 must be the top left and coordinate 2 must be the bottom right coordinate otherwise it may not work properly.</li>
+      <li><code>.t &lttile id&gt</code> - sets the tile/sprite id of the editor brush</li>
+      <li><code>.tl &ltlayer number&gt</code> - toggles the visibility of the layer</li>
+      <li><code>.l &ltlayer number&gt</code> - switches the layer currently being edited by the editor brush</li>
+    </ul>
+
+    <table>
+      <tr><th>command syntax</th>          <th>description</th></tr>
+      <tr><td>.db new &ltx&gt &lty&gt &ltw&gt &lth&gt</td><td></td></tr>
+      <tr><td>.db focus &ltid&gt</td><td></td></tr>
+      <tr><td>.db edit</td><td></td></tr>
+      <tr><td>.db choice &ltup&gt &ltleft&gt &ltdown&gt &ltright&gt &ltscript_name&gt</td><td></td></tr>
+      <tr><td>.db delete</td><td></td></tr>
+      <tr><td>.db toscript &ltname&gt</td><td></td></tr>
+      <tr><td>.db s &ltname&gt</td><td></td></tr>
+      <tr><td>.db write &ltline&gt</td><td></td></tr>
+      <tr><td>.db mode &lt&gt</td><td></td></tr>
+      <tr><td>.db cursor &lt&gt &lt&gt</td><td></td></tr>
+      <tr><td>.db reset</td><td></td></tr>
+      <tr><td>.db x</td><td></td></tr>
+      <tr><td>.db y</td><td></td></tr>
+      <tr><td>.db w</td><td></td></tr>
+      <tr><td>.db h</td><td></td></tr>
+      <tr><td></td><td></td></tr>
+    </table>
+    <h3>Import / Export Commands</h3>
+    <ul>
+      <li><code>.exportjs map</code></li>
+      <li><code>.exportjs scripts</code></li>
+      <li><code>.export map</code> - saves the map to a file</li>
+      <li><code>.import map</code> - opens a map from a file</li>
+      <li><code>.export script &ltscript name&gt</code> - save a script as a file which, when dragged onto the app, will define the given script and not execute it</li>
+      <li><code>.export raw &ltscript name&gt</code> - save a script as a file which will run the script when dragged onto the app</li>
+      <li><code>.export scripts</code> - export all scripts</li>
+      <li><code>.export ents &ltscript name&gt</code></li>
+    </ul>
+    <h3>FX Commands</h3>
+    <ul>
+      <li>.rain</li>
+      <li>.torch</li>
+    </ul>
+    <h3>System Commands</h3>
+    <ul>
+      <li><code>.cfg [[&ltproperty&gt &ltvalue&gt]...]</code></li>
+      <li><code>.pagebg &ltcss color&gt</code></li>
+      <li>.editor &ltscript name&gt</li>
+    </ul>
+    <h2 id="planned-commands">Planned Commands</h2>
+      <table>
+        <tr><th>command syntax</th>          <th>description</th></tr>
+        <tr><td>.import script</td>          <td></td></tr>
+        <tr><td>.reload</td>                 <td></td></tr>
+        <tr><td>.tcol &ltid&gt &lt0|1&gt</td><td></td></tr>
+        <tr><td>.lcol &ltid&gt &lt0|1&gt</td><td></td></tr>
+        <tr><td>.ent clear</td>              <td></td></tr>
+        <tr><td>.radix &ltradix&gt</td>      <td></td></tr>
+        <tr><td>.sprites</td>                <td></td></tr>
+        <tr><td>.adapt</td>                <td></td></tr>
+        <tr><td>.t</td>                <td></td></tr>
+      </table>
+  </article>
+  <aside class="right-sidebar">
+  </aside>
+</section>
+<footer>
+	<p>Footer</p>
+</footer>
+</body>
+</html>
+

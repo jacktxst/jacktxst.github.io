@@ -1,308 +1,113 @@
 <!DOCTYPE html>
-<html>
-	<head>
-		<style>
-			.canvas-container {
-				display: flex;
-				justify-content: center;
-				align-items: center;
+<html lang="en">
+<head>
+  <title>Home Page</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet">
 
-				height: 100vh;
-			}
-		</style>
-		<script>
-			class vec2 {
-				constructor(x,y) {
-					this.x = x;
-					this.y = y;
-				}
-				plus(vec) {
-					return new vec2(this.x + vec.x, this.y + vec.y);
-				}
-				minus(vec) {
-					return new vec2(this.x - vec.x, this.y - vec.y);
-				}
-				times(value) {
-					return new vec2(this.x * value, this.y * value);
-				}
-				length() {
-					return Math.sqrt(this.x * this.x + this.y * this.y);
-				}
-			}
-			const MAP_WIDTH	 = 256;
-			const MAP_HEIGHT = 256;
-			const LAYERS = 4;
-			const DATA_SIZE = 2;
-			const TILE_SIZE = 16;
-			const mapBuffer = new ArrayBuffer(MAP_WIDTH	 * MAP_HEIGHT * LAYERS * DATA_SIZE);
-			const mapData = new Uint8Array(mapBuffer);
+  <link rel="stylesheet" href="docs.css"/>
+</head>
+<body>
 
-			var typing = false;
-			var ctx, canvas, sprites;
-			var textInput = "";
-			var lastClickWorldPos = new vec2();
-			var mouseScreenX, mouseScreenY, mouseWorldX, mouseWorldY;
-			var cameraRect = {x: 0, y: 0, dx: 320, dy: 180}
-			var tileId = 1;
-			var editLayer = 0;
-			var pos1 = new vec2();
-			var pos2 = new vec2();
+<header>
+  <h2>pixlwrld maker</h2>
+</header>
 
-			const inputMap = {
-				"MOVE_UP"   : ["w"],
-				"MOVE_LEFT" : ["a"],
-				"MOVE_DOWN" : ["s"],
-				"MOVE_RIGHT": ["d"]
-			};
-			var inputState = {
-				"MOVE_UP"   : false,
-				"MOVE_LEFT" : false,
-				"MOVE_DOWN" : false,
-				"MOVE_RIGHT": false
-			};
-			const tileSet = {
-				"x":0,
-				"y":0,
-				"tileSize":16,
-				"columns":16,
-				"rows":16,
-			}
-			const activeFont = {
-				"x": 192, // start x coordinate of the font in sprites.png
-				"y": 192, // start y coordinate of the font in sprites.png
-				"charSize": 8,
-				"columns": 8,
-				"rows": 8,
-				/*
-				list of all characters in the font. index of each character
-				in this string corresponds to index of the character in the
-				font image.
-				 */
-				"validChars": "abcdefghijklmnopqrstuvwxyz0123456789. "
-			}
-			const KeyEventType = {KEYUP:false,KEYDOWN:true}; // enum
-			function setTile(x, y, tile, layer=0) {
-				var mapIndex = (y * MAP_WIDTH + x + MAP_WIDTH * MAP_HEIGHT * layer) * DATA_SIZE;
-				mapData[mapIndex] = tile;
-			}
-			function getTile(x, y, layer) {
-				var mapIndex = (y * MAP_WIDTH + x + MAP_WIDTH * MAP_HEIGHT * layer) * DATA_SIZE;
-				return {
-					id: mapData[mapIndex],
-					rotation: mapData[mapIndex+1]
-				};
-			}
-			function rotateTile(x, y, layer=0) {
-				var mapIndex = (y * MAP_WIDTH + x + MAP_WIDTH * MAP_HEIGHT * layer) * DATA_SIZE;
-				mapData[mapIndex+1] += 1;
-			}
-			// processes the command entered into textInput
-			function processCommand() {
-				if (textInput.slice(0,3) == ".t ") {
-					tileId = parseInt(textInput.slice(3));
-				} else if (textInput == ".open") {
-					const fileInput = document.createElement("input");
-					fileInput.type = "file";
-					fileInput.style.display = "none";
-					document.body.appendChild(fileInput);
-					fileInput.addEventListener("change", async (event) => {
-						const file = event.target.files[0];
-						if (!file) return;
-						const fileBuffer = await file.arrayBuffer();
-						const fileData	 = new Uint8Array(fileBuffer);
-						const length = Math.min(mapData.length, fileData.length);
-						mapData.set(fileData.subarray(0, length), 0);
-						console.log(`Loaded ${length} bytes into fixed ArrayBuffer`);
-					});
-					fileInput.click();
-					document.body.removeChild(fileInput);
-				} else if (textInput == ".save") {
-					const blob = new Blob([mapBuffer], { type: 'application/octet-stream' });
-					const url = URL.createObjectURL(blob);
-					const a = document.createElement('a');
-					a.href = url;
-					a.download = 'map'; // Specify the desired filename and extension
-					document.body.appendChild(a);
-					a.click();
-					document.body.removeChild(a);
-					URL.revokeObjectURL(url);
-				} else if (textInput.slice(0,4) == ".tp ") {
-					args = textInput.slice(4).split(" ");
-					cameraRect.x = args[0];
-					cameraRect.y = args[1];
-				} else if (textInput.slice(0,3) == ".l ") {
-					editLayer = parseInt(textInput.slice(3));
-				} else if (textInput == ".1") {
-					pos1.x = Math.floor(lastClickWorldPos.x / TILE_SIZE);
-					pos1.y = Math.floor(lastClickWorldPos.y / TILE_SIZE);
-				} else if (textInput == ".2") {
-					pos2.x = Math.floor(lastClickWorldPos.x / TILE_SIZE);
-					pos2.y = Math.floor(lastClickWorldPos.y / TILE_SIZE);
-				} else if (textInput == ".r") {
-					rotateTile( Math.floor(lastClickWorldPos.x / TILE_SIZE), Math.floor(lastClickWorldPos.y / TILE_SIZE), editLayer )
-				} else if (textInput == ".f") {
-					for     (let x = Math.min(pos1.x, pos2.x); x <= Math.max(pos1.x, pos2.x); x++) {
-						for (let y = Math.min(pos1.y, pos2.y); y <= Math.max(pos1.y, pos2.y); y++) {
-							setTile(x, y, tileId, editLayer);
-						}
-					}
-				}
-				textInput = "";
-			}
-			function handleTypedKeyEvent(event, keyEventType) {
-				if (keyEventType == KeyEventType.KEYUP) return;
-				if (event.key === "Backspace") {textInput = textInput.slice(0,-1); return;}
-				if (event.key === "Enter") {typing = false; processCommand(); return;}
-				if (!activeFont.validChars.includes(event.key)) return;
-				textInput += event.key;
-			}
-			function handleKeyEvent(event, keyEventType) {
-				if (event.key == " ") event.preventDefault();
-				if (event.key == ".") typing = true;
-				if (typing) handleTypedKeyEvent(event, keyEventType);
-				for (action of Object.keys(inputMap)) {
-					if (inputMap[action].includes(event.key)) {
-						inputState[action]=keyEventType;
-					}
-				}
-			}
-			function handleKeydownEvent(event) {handleKeyEvent(event, KeyEventType.KEYDOWN );}
-			function handleKeyupEvent(event)   {handleKeyEvent(event, KeyEventType.KEYUP);}
-			function handleMousemoveEvent(event) {
-				const rect = canvas.getBoundingClientRect();
-				mouseScreenX = (event.clientX - rect.left) / 4;
-				mouseScreenY = (event.clientY - rect.top) / 4;
-				mouseWorldX  = mouseScreenX + cameraRect.x;
-				mouseWorldY  = mouseScreenY + cameraRect.y;
-			}
-			function handleClickEvent(event) {
-				handleMousemoveEvent(event);
-				lastClickWorldPos.x = mouseScreenX + cameraRect.x;
-				lastClickWorldPos.y = mouseScreenY + cameraRect.y;
-				setTile(Math.floor(lastClickWorldPos.x/TILE_SIZE), Math.floor(lastClickWorldPos.y/TILE_SIZE), tileId, editLayer);
-			}
-			function printText(text, x, y, font) {
-				for (char of text) {
-					if (font.validChars.includes(char)) {
-						let charIndex = font.validChars.indexOf(char);
-						let charX = font.x + font.charSize * (charIndex % font.columns)
-						let charY = font.y + font.charSize * (Math.floor(charIndex / font.columns))
-						ctx.drawImage(sprites, charX, charY, font.charSize, font.charSize, x, y, font.charSize, font.charSize)
-					}
-					x += font.charSize;
-				}
-			}
-			function init() {
-				window.addEventListener('keydown', handleKeydownEvent);
-				window.addEventListener('keyup', handleKeyupEvent);
-				window.addEventListener('mousemove', handleMousemoveEvent);
-				window.addEventListener('click', handleClickEvent);
-				window.requestAnimationFrame(gameLoop);
-				canvas = document.getElementById("canvas");
-				ctx = canvas.getContext("2d");
-				ctx.imageSmoothingEnabled = false;
-				sprites = document.getElementById("sprites");
-			}
-			function spriteIndexToTextureCoords(spriteIndex) {
-				var coords = new vec2();
-				coords.x = tileSet.x + tileSet.tileSize * (           spriteIndex % tileSet.columns)
-				coords.y = tileSet.x + tileSet.tileSize * (Math.floor(spriteIndex / tileSet.columns))
-				return coords;
-			}
-			// draws tile data from mapData / mapBuffer onto canvas from the perspective of cameraRect
-			function drawWorld(layer) {
-				// convert camera bounding box pixel coordinates to tile coordinates
-				var tileCoords = {
-					x : Math.floor(cameraRect.x / TILE_SIZE),
-					y : Math.floor(cameraRect.y / TILE_SIZE),
-					x2: Math.floor(cameraRect.x / TILE_SIZE) + Math.floor(cameraRect.dx / TILE_SIZE),
-					y2: Math.floor(cameraRect.y / TILE_SIZE) + Math.floor(cameraRect.dy / TILE_SIZE)
-				}
-				// draw tiles
-				for     (tileY    = tileCoords.y; tileY    <= tileCoords.y2; tileY++) {
-					for (tileX = tileCoords.x; tileX <= tileCoords.x2; tileX++) {
-						if (tileY < 0 || tileY >= MAP_HEIGHT) continue;
-						if (tileX < 0 || tileX >= MAP_WIDTH	) continue;
-						let tile = getTile(tileX, tileY, layer)
-						let textureCoords = spriteIndexToTextureCoords(tile.id);
-						let screenCoords = new vec2(tileX * TILE_SIZE - cameraRect.x, tileY * TILE_SIZE - cameraRect.y);
-						ctx.save();
-						ctx.translate(screenCoords.x + TILE_SIZE / 2, screenCoords.y + TILE_SIZE / 2);
-						ctx.rotate((tile.rotation % 4) * Math.PI / 2);
-						ctx.drawImage(
-								sprites,
-								textureCoords.x, textureCoords.y, TILE_SIZE, TILE_SIZE,
-								-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE
-						);
-						ctx.restore();
-					}
-				}
-			}
-			function collision() {
-				for (let i = 0; i < LAYERS; i++) {
-					let tile = getTile(Math.floor((cameraRect.x+cameraRect.dx/2)/TILE_SIZE), Math.floor((cameraRect.y+cameraRect.dy/2)/TILE_SIZE), i);
-					if (tile.id > 3) return true;
-				}
-				return false;
-			}
-			
-			function gameLoop(timestamp) {
-				const SPEED = 1
+<section class="main-container">
+  <!-- Left Sidebar -->
+  <aside class="left-sidebar">
+    <div class="sidebar-section">
+      <h3>Navigation</h3>
+      <ul>
+        <li><a href="#">Home</a></li>
+        <li><a href="pixlwrld.html">Download or use the engine in your browser now</a></li>
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>Topics</h3>
+      <ul>
+        <li><a href="entities.html">Entities</a></li>
+        <li><a href="commands.html">Commands</a></li>
+        <li><a href="scripts.html">Scripts</a></li>
+        <li><a href="collision.html">Collision</a></li>
+        <li><a href="tilemap.html">Tile Map</a></li>
+        <li><a href="versions.html">Version History</a></li>
 
-				//HANDLE INPUT
-				if (inputState.MOVE_UP)    {cameraRect.y -= SPEED; if (collision()) {cameraRect.y += SPEED}}
-				if (inputState.MOVE_LEFT)  {cameraRect.x -= SPEED; if (collision()) {cameraRect.x += SPEED}}
-				if (inputState.MOVE_DOWN)  {cameraRect.y += SPEED; if (collision()) {cameraRect.y -= SPEED}}
-				if (inputState.MOVE_RIGHT) {cameraRect.x += SPEED; if (collision()) {cameraRect.x -= SPEED}}
-				//HANDLE LOGIC
+      </ul>
+    </div>
+    
+  </aside>
 
-				//RENDER
+  <!-- Main Article Content -->
+  <article class="main-content">
+    <h2>Overview</h2>
+    <p>pixlworldmaker is a lightweight, cross-platform, open-source web-based game engine for 2D games with pixellated graphics. It's particularly tailored in favor of RPG style games, but is capable of doing more. It has a hybrid editor/player architecture, so the developer can run commands to edit game content at runtime. The engine is designed to include enough built-in features for a game to be made only through the use of developer commands and scripting using a simple custom script system. I made this engine using vanilla JavsScript, HTML and CSS.</p>
+    <h2>What is this for?</h2>
+    <p>If you want to make a game like Undertale, Earthbound, A Link to The Past, Final Fantasy 6, this engine might be for you.
 
-				ctx.fillStyle = "#222233";
-				ctx.fillRect(0,0,canvas.width,canvas.height);
+    <p>If you're an artist and don't want to worry about programming, you're definitely in the right place. The game making tools of the engine are designed to be very beginner friendly. Maybe not quite yet, but once I work on some more tutorials and examples.
 
-				ctx.scale(4,4);
+    <p>If you want to make games that can run on any platform including mobile, this engine can do that very very well. (Not quite yet, but this will be easy to add)
 
-				drawWorld(0);
-				drawWorld(1);
-				drawWorld(2);
-				drawWorld(3);
+    <p>If you want to make games that have really small sizes and run extremely fast even on the worst devices, this engine is made exactly for that!
+    <h2>Getting Started</h2>
+    <p>I plan to offer a few different release flavors of the engine as well as some add-on modules for extra features. For now, the entire engine lives in a single .html file. All you have to do is download this file. You don't need a server to use it, it runs just fine locally. All the JavaScript code for the engine is in this file. For more complex games you'll likely want to use multiple JavaScript files. The engine will support this.</p>
+    <p>For real though, you'll probably want to download some more files from the GitHub repository to help get you started. The sections below explain the kinds of things to look for.
+    
+    <h3>sprites.png</h3>
 
-				// DISPLAY CHARACTER
-				ctx.drawImage(sprites,16,16,16,16,cameraRect.dx/2-8,cameraRect.dy/2-8, 16, 16)
+    <p>In order to start, the engine needs a sprites.png file. This file can be placed in the directory with the html file or can be dragged onto the page at any time. The sprites.png file contains ALL images for the game and is divided by the engine into a set of tiles / sprites of a certain height and width. <a href="sprites.html">Click here to learn more about sprites and sprites.png.</a>
 
-				// DISPLAY TILE CURSOR
-				ctx.fillStyle = "#444444";
-				ctx.globalAlpha = 0.5;
-				let tCoords = spriteIndexToTextureCoords(tileId);
-				ctx.drawImage(sprites,
-							  tCoords.x,
-						      tCoords.y,
-						      TILE_SIZE,
-						      TILE_SIZE,
+    <p> Currently, sprites.png is the only file that is automatically picked up by the engine if it's placed into the directory. This is because <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS">browsers don't let locally running web pages grab random files</a>. Images are an exception to this. There are a lot of good ways to get around this which will eventually be supported by the engine.
 
-						      Math.floor(mouseWorldX/TILE_SIZE)*TILE_SIZE-cameraRect.x,
-						      Math.floor(mouseWorldY/TILE_SIZE)*TILE_SIZE-cameraRect.y,
-						      TILE_SIZE,
-						      TILE_SIZE)
-				ctx.globalAlpha = 1;
+    <h3>.map file</h3>
 
-				if(typing) printText(textInput, 0, 0, activeFont);
-				printText(`x${String(cameraRect.x).padStart(4, "0")}y${String(cameraRect.y).padStart(4, "0")}`,0,8,activeFont);
+    <p>A .map file stores the tile data of the entire world in an uncompressed binary format. Through a point-and-click interface combined with a set of commands like fill and copy, the map can be edited with ease in-game by the developer. The map can also easily be saved to a file. <a href="world.html">Click here to read more about the map and .map files.</a>
+    <p> When you publish a game, there will be support for placing .map files in the directory with the web page, but this is not yet supported. For now, you have to drag a .map file onto the game or run the command <code>.import map</code>.
+    <h3>scripts</h3>
 
-				ctx.scale(0.25,0.25);
+    <p>A <a href="commands.html#scripts">script</a> is a series of <a href="commands.html">commands</a> that can be triggered by certain events and <a href="entities.html">entities</a> in the game. You can start writing a script in game using the .edit command, or you can drag a .txt file onto the game and it will immediately execute as a script. Some .txt file scripts are made to define several scripts without running them using the .edit command. This means that all the scripts for a game can be packaged into a single, or multiple .txt files. Scripts are responsible for the creation of <a href="entities.html">entities</a> , <a href="dialog.html">the management of U.I. and dialog,</a> setting <a href="configuration.html">configuration</a> values, and more. <a href="commands.html#scripts">Click here to read more about scripts.</a>
 
-				window.requestAnimationFrame(gameLoop);
-			}
-			window.addEventListener('DOMContentLoaded', init);
+    </p>
 
+    <p> When you publish a game, there will be support for placing .txt files in the directory with the web page, but this is not yet supoprted.
+    
+    <h2> What's missing? </h2>
+    - a system for creating world and character animations<br>
+    - a system for playing audio<br>
+    - inventory, health, battle mechanics<br>
+    - just more simple lil utility commands<br>
+    - a couple more ui features <br>
+    - mobile support <br>
 
-		</script>
-	</head>
-	<body>
-		<div class="canvas-container">
-			<canvas id="canvas" height="720" width="1280"></canvas>
-		</div>
-		<img src="sprites.png" id="sprites">
-	</body>
+    <h2> What's missing in the docs? </h2>
+    - configuration<br>
+    - <a href="dialog.html">dialog box</a> stuff<br>
+    
+  </article>
+
+  <!-- Right Sidebar -->
+  <aside class="right-sidebar">
+    
+    
+    
+    
+    <div class="sidebar-section">
+      <h3>External Links</h3>
+      <ul>
+        <li><a href="#">About Me</a></li>
+        
+      </ul>
+    </div>
+  </aside>
+</section>
+
+<footer>
+  <p>Footer</p>
+</footer>
+
+</body>
 </html>
+

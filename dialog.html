@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>dialog + ui - pixlwrldmaker docs</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="docs.css"/>
+</head>
+<body>
+<header>
+    <h2>dialog + ui</h2>
+</header>
+<section class="main-container">
+    <aside class="left-sidebar">
+        <div class="sidebar-section">
+            <h3>Navigation</h3>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="entities.html">Entities</a></li>
+                <li><a href="commands.html">Commands</a></li>
+                <li><a href="collision.html">Collision</a></li>
+            </ul>
+        </div>
+    </aside>
+    <article class="main-content">
+        <h1>alpha 1.0</h1>
+        <p>The commands starting with .db are used to manage dialog boxes.
+        In a similar fashion to entities, dialog boxes have a
+        specific set of typed properties.
+
+        <table>
+            <tr>
+                <th>Property</th> <th>Type</th> <th>Default</th> <th>Description</th>
+            </tr>
+            <tr>
+                <td>visible</td> <td>boolean</td> <td>true</td> <td></td>
+            </tr>
+            <tr>
+                <td>enabled</td> <td>boolean</td> <td>true</td> <td></td>
+            </tr>
+            <tr>
+                <td>x</td> <td>integer</td> <td>N/A: Required</td> <td></td>
+            </tr>
+            <tr>
+                <td>y</td> <td>integer</td> <td>N/A: Required</td> <td></td>
+            </tr>
+            <tr>
+                <td>w</td> <td>integer</td> <td>N/A: Required</td> <td></td>
+            </tr>
+            <tr>
+                <td>h</td> <td>integer</td> <td>N/A: Required</td> <td></td>
+            </tr>
+            <tr>
+                <td>cols</td> <td>integer</td> <td></td> <td></td>
+            </tr>
+            <tr>
+                <td>rows</td> <td>integer</td> <td></td> <td></td>
+            </tr>
+            <tr>
+                <td>panx</td> <td>integer</td> <td></td> <td></td>
+            </tr>
+            <tr>
+                <td>pany</td> <td>integer</td> <td></td> <td></td>
+            </tr>
+            <tr>
+                <td>lines</td> <td>string array</td> <td></td> <td></td>
+            </tr>
+        </table>
+
+        <h3>Dialog Commands (.db)</h3>
+        <table>
+            <tr><th>command syntax</th>          <th>description</th></tr>
+            <tr><td>.db new &ltx&gt &lty&gt &ltw&gt &lth&gt</td><td>creates an empty box</td></tr>
+            <tr><td>.db focus &ltid&gt</td><td></td></tr>
+            <tr><td>.db edit</td><td>allow the user to use the box as a text editor</td></tr>
+            <tr><td>.db choice &ltup&gt &ltleft&gt &ltdown&gt &ltright&gt &ltscript_name&gt</td><td>add a menu choice to the dialog box at the position where the cursor currently is. the direction arguments are indexes of other choices that should be jumped to when those arrow keys are pressed and script_name runs whenever this choice is selected and the confirm key is pressed.. </td></tr>
+            <tr><td>.db delete</td><td></td></tr>
+            <tr><td>.db toscript &ltname&gt</td><td>saves a script which will recreate this dialog box when called</td></tr>
+            <tr><td>.db s &ltname&gt</td><td>saves the text content of this dialog box directly to a script for in-game script editing purposes</td></tr>
+            <tr><td>.db write &ltline&gt</td><td>write a single line of text to the box</td></tr>
+            <tr><td>.db mode &ltovertype|menu&gt</td><td>determines the behavior of the cursor</td></tr>
+            <tr><td>.db cursor &ltcol&gt &ltrow&gt</td><td>sets the position of the cursor</td></tr>
+            <tr><td>.db play</td><td>play a character-by-character text printing animation</td></tr>
+            <tr><td>.db x &ltx&gt</td><td></td></tr>
+            <tr><td>.db y &lty&gt</td><td></td></tr>
+            <tr><td>.db w &ltw&gt</td><td></td></tr>
+            <tr><td>.db h &lth&gt</td><td></td></tr>
+            <tr><td></td><td></td></tr>
+        </table>
+
+    </article>
+    <aside class="right-sidebar">
+    </aside>
+</section>
+<footer>
+    <p>Footer</p>
+</footer>
+</body>
+</html>
+

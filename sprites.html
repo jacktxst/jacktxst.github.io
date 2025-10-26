@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>sprites and animation - pixlwrldmaker docs</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="docs.css"/>
+</head>
+<body>
+
+<header>
+  <h2>sprites and animation</h2>
+</header>
+
+<section class="main-container">
+  <!-- Left Sidebar -->
+  <aside class="left-sidebar">
+    <div class="sidebar-section">
+      <h3>Navigation</h3>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="entities.html">Entities</a></li>
+        <li><a href="commands.html">Commands</a></li>
+        <li><a href="collision.html">Collision</a></li>
+      </ul>
+    </div>
+    
+    
+    
+
+  </aside>
+
+  <!-- Main Article Content -->
+  <article class="main-content">
+    <h1>Sprites</h1>
+    <p>All art for the game is packaged into a single sprites.png file. There is a value in the config, tileSize, which determines how sprites.png will be split up into individual sprites.
+    <p>A sprite is referred to by an id number. Sprite 0 is the sprite located at the top left of sprites.png. Sprite 0 should typically be blank space.
+    <p>A tile id is actually just a sprite id.
+    <p>Although tileSize determines how sprites are indexed, you can easily draw sprites of varying sizes.
+    <p> drawSprite(spriteId, dx, dy, width, height) 
+    <ul>
+      <li>spriteId</li>
+      <li>dx - destination x coordinate, top left corner of the sprite on the screen</li>
+      <li>dy - destination x coordinate, top left corner of the sprite on the screen</li>
+      <li>w - width. can extend into neighboring cells on the sprite sheet to create sprites bigger than tileSize.</li>
+      <li>h  - height. can extend into neighboring cells on the sprite sheet to create sprites bigger than tileSize.</li>
+      <li>r  - rotation in radians</li>
+    </ul>
+    
+      <h2 id="entity-animations"> entity animations</h2>
+      <p> entities need to support a few different types of animations. for now i'm going to implement these in the NPC entity type. through commands, there needs to be a way to setup animations where the sprite frame shown for an entity changes over time, and there needs to be a way for an npc to move along a scripted path. after these animations finish, commands can automatically be set to run. through this system the developer can create all kinds of scripted sequences, cutscenes etc. read the article about <a href="ents/npc.html">npcs</a> for more info.
+      <h2 id="tile-animation"> tile animations </h2>
+      the developer should be able to define animation data for every individual tile type, and those tiles should display as animated in the world. for example, running water.
+  
+  </article>
+
+  <!-- Right Sidebar -->
+  <aside class="right-sidebar">
+    <div class="sidebar-section">
+    </div>
+  </aside>
+</section>
+
+<footer>
+  <p>Footer</p>
+</footer>
+
+</body>
+</html>
+

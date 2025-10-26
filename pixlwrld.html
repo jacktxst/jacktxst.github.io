@@ -1,0 +1,1537 @@
+<!--
+
+DO NOT PANIC
+
+I recommend that you start by just opening this page in a compatible browser.
+Upon doing so you will see some more instructions.
+
+-->
+<!DOCTYPE html><html lang="en"><head><title>Yeah</title></head><body><a href="index.html">docs</a><script src="allscripts.js"></script><script src="world.map.js"></script><script>
+//
+// TODO: click / tap on dialog box
+// TODO: ent export does not enclose strings properly
+// TODO: helpful command feedback system
+// TODO: invalid chars should display special not as a space
+// TODO: a way for multiple entitites to move together
+// TODO: FIX: files import out of order BBBADD
+// TODO: cvar command
+// TODO: ent create should focus the entity
+// TODO: ent list?
+// TODO:
+// TODO: commands for modifying dialog boxes size and pos for development purposes
+// TODO: commands for EDITING scripts
+// TODO: ability to bind keys to commands
+// TODO: FIX: choices should only work in menu mode
+// TODO: FIX: selection choice index should remain in bounds
+// TODO: command for removing choices
+// TODO: command for selecting a certain choice
+// TODO: FIX: camera coords probably not accurate.
+// TODO: make sure the right number of arguments is enforced
+// TODO: arrow keys to navigate user command history
+// TODO: command macros?
+// TODO: command variables? conditionals?
+
+////////////////////
+// INITIALIZATION //
+////////////////////
+const config = {
+    "width"         : 320,
+    "height"        : 200,
+    "scalex"        : 4,
+    "scaley"        : 4,
+    "fontX"         : 192,
+    "fontY"         : 192,
+    "fontSize"      : 8,
+    "fontColumns"   : 8,
+    "fontRows"      : 8,
+    "fontValidChars": "abcdefghijklmnopqrstuvwxyz0123456789.█-#\"_ ",
+    "tileSize"      : 16,
+    "tileColumns"   : 16,
+    "tileRows"      : 16,
+    "mapWidth"      : 256,
+    "mapHeight"     : 256,
+    "mapLayers"     : 4,
+    "mapDataSize"   : 2,
+    "playerSprite"  : 35,
+    "playerSize"    : 16,
+    "playerSpeed"   : 0.01,
+    "inputMap"      : {
+        "w"         :"move_up",
+        "a"         :"MOVE_LEFT",
+        "s"         :"MOVE_DOWN",
+        "d"         :"MOVE_RIGHT",
+        "ArrowUp"   :"NAV_UP",
+        "ArrowLeft" :"NAV_LEFT",
+        "ArrowDown" :"NAV_DOWN",
+        "ArrowRight":"NAV_RIGHT",
+        " "         :"ATTACK",
+        "."         :"CONSOLE",
+        "Enter"     :"CONFIRM",
+        "e"         :"interact"
+    }
+}
+
+let hasInitialized = false;
+let typing = null;
+let ctx = null;
+let lastTimestamp = 0;
+let delta = null;
+
+function init() {
+    if (hasInitialized) return;
+    hasInitialized = true;
+    if (typeof PKG_ALLSCRIPTS !== 'undefined') CommandInterpreter.executeScript(PKG_ALLSCRIPTS);
+    //Create a canvas
+    let canvas    = document.createElement("canvas");
+    canvas.id     = "canvas";
+    canvas.width  = config.width  * config.scalex;
+    canvas.height = config.height * config.scaley;
+    canvas.style.display = "block";
+    canvas.style.marginLeft = "auto";
+    canvas.style.marginRight = "auto";
+    document.body.appendChild(canvas);
+    ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    function reposButtons() {
+        const rect = canvas.getBoundingClientRect();
+
+        for (let btn of document.getElementsByTagName("button")) {
+            btn.style.left = (rect.left+ btn.offset[0]) + "px";
+            btn.style.top = (rect.top+btn.offset[1]) + "px";
+        }
+    }
+    canvas.addEventListener("resize", reposButtons)
+    function button(display,key,offset) {
+        const btn = document.createElement("button");
+        btn.textContent = display;
+        btn.offset = offset;
+        btn.style.position = "absolute";
+        //btn.style.bottom = "10px";
+        btn.style.padding = "5px 10px";
+        btn.style.fontSize = "24px";
+        btn.style.background = "rgba(0,0,0,0.5)";
+        btn.style.color = "white";
+        btn.style.border = "none";
+        btn.style.borderRadius = "12px";
+        btn.style.opacity = "0.8";
+        btn.style.touchAction = "manipulation";
+        let kevent = (dir, key) => {window.dispatchEvent(new KeyboardEvent("key"+dir, { key: key }))}
+        btn. addEventListener("touchstart", (e)=>{kevent("down",key)})
+        btn. addEventListener("mousedown", (e)=>{kevent("down",key)})
+        btn. addEventListener("touchend", (e)=>{kevent("up",key)})
+        btn. addEventListener("mouseup",   (e)=>{kevent("up",key)})
+        document.body.appendChild(btn);
+    }
+
+    button("w","w",[32,0]);
+    button("a","a",[0,32]);
+    button("d","d",[64,32]);
+    button("s","s",[32,64]);
+
+    reposButtons();
+
+
+    if (!CommandInterpreter.hasRanInitScript) {
+        CommandInterpreter.execute(".exec init");
+    }
+
+    window.requestAnimationFrame(gameLoop);
+}
+
+////////////////////
+// math / utility //
+////////////////////
+
+
+
+/////////////////////
+// INPUT MANAGEMENT//
+/////////////////////
+
+const Actions = {};
+const Mouse = {x:0,y:0};
+window.addEventListener("keydown", (e) => {
+    if (typing) {
+        if ([" "].includes(e.key)) e.preventDefault();
+        if (ActiveDialogBox > -1) Dialog[ActiveDialogBox].handleEvent(e);
+        if (DevConsole.focused) DevConsole.handleEvent(e);
+    } else
+    for (let keybind of Object.keys(config.inputMap)) {
+        if (e.key === keybind) {
+            e.preventDefault();
+            if (!Player.prevent.includes(config.inputMap[keybind]))
+            Actions[config.inputMap[keybind]] = true;// TODO: fix, does not currently support multiple actions per key
+        }
+    }
+});
+window.addEventListener("keyup", (e) => {
+    for (let keybind of Object.keys(config.inputMap)) {
+        if (e.key === keybind) {
+            Actions[config.inputMap[keybind]] = false;// TODO: fix, does not currently support multiple actions per key
+        }
+    }
+});
+window.addEventListener("mousemove", (e) => {
+    let rect;
+    try {
+        rect = canvas.getBoundingClientRect();
+    } catch (e) {
+        return;
+    }
+    Mouse.x = Math.floor((e.clientX - rect.left) / config.scalex);
+    Mouse.y = Math.floor((e.clientY - rect.top) / config.scaley);
+    Mouse.worldX  = Mouse.x + Camera.x1;
+    Mouse.worldY  = Mouse.y + Camera.y1;
+}); // TODO : consider: clamping mouse to the canvas
+window.addEventListener("click", (e) => {
+    //
+    brush.stroke();
+});
+
+///////////
+// FILES //
+///////////
+
+function exportDataJs(data, filename) {
+    let js = "let package = \""
+    js += data.toHex() + `";`;
+
+    const blob = new Blob([js], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename; // Specify the desired filename and extension
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function exportData(data, filename, type='text/plain') {
+    const blob = new Blob([data], { type: type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename; // Specify the desired filename and extension
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+
+let sprites = document.createElement("img");
+sprites.id = "sprites";
+sprites.src = "sprites.png";
+sprites.style.display = 'none';
+sprites.onload  = () => { 
+    console.log("sprites loaded"); init();
+};
+sprites.onerror = () => { 
+    console.log("did not load sprites");
+};
+document.body.appendChild(sprites);
+
+// drag and drop files
+// TODO : dragging and dropping maps, scripts, and config files
+window.addEventListener("dragover", e => {
+    e.preventDefault();
+});
+window.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (!files.length) return;
+    for (let file of files) {
+        if (file.type === "image/png") {
+            let sprites = document.getElementById("sprites")
+            sprites.src = URL.createObjectURL(file);
+        } else if (file.name.endsWith(".map")) {
+            const fileBuffer = await file.arrayBuffer();
+            const fileData = new Uint8Array(fileBuffer);
+            const length = Math.min(map.data.length, fileData.length);
+            map.data.set(fileData.subarray(0, length), 0);
+        } else if (file.name.endsWith(".txt")) {
+            const text = await file.text();
+            CommandInterpreter.executeScript(text);
+        }
+    }
+    if (!CommandInterpreter.hasRanInitScript) {
+        CommandInterpreter.execute(".exec init");
+    }
+})
+
+//////////////////
+// SECTION MISC //
+//////////////////
+
+const LightFX = {
+    enabled: false,
+    w : 48,
+    h : 48,
+    x : config.width/2-48/2,
+    y : config.height/2-48/2,
+    opacity : 0.9,
+    draw() {
+        if (!this.enabled) return;
+        ctx.save()
+        ctx.globalAlpha = this.opacity;
+        drawSprite(27,this.x,this.y,this.w,this.h)
+        ctx.fillStyle = "black";
+        ctx.fillRect(0,0,this.x,config.height);
+        ctx.fillRect(this.x,0,this.w,this.y);
+        ctx.fillRect(this.x+this.w,0,this.x,config.height);
+        ctx.fillRect(this.x,this.y+this.h,this.w,this.y);
+        ctx.restore()
+    }
+}
+
+const brush = {  // TODO : more brush types, brush scripts?
+    tileId  : 1,
+    rotation: 0,
+    layer   : 0, // TODO : multi layer editing
+    stroke  : function () {
+        let x = Math.floor(Mouse.worldX / config.tileSize);
+        let y = Math.floor(Mouse.worldY / config.tileSize);
+        map.set(x, y, this.layer, [this.tileId, this.rotation]);
+    }
+};
+
+const RainFX = {
+    enabled: false,
+    thunderFlash: 0,
+    thunderTimer: 0,
+    flashSpeed: 0.001,
+    thunderTimerMax : 5000,
+    offset: [0,0],
+    speed: [0.005, 0.1],
+    draw() {
+        if (!this.enabled) return;
+        this.offset[0] = ( this.offset[0] + delta * this.speed[0] ) % config.tileSize;
+        this.offset[1] = ( this.offset[1] + delta * this.speed[1] ) % config.tileSize;
+        for (let x = -config.tileSize; x < config.width; x += config.tileSize) {
+            for (let y = -config.tileSize; y < config.height; y += config.tileSize) {
+                drawSprite(14, Math.floor(x+this.offset[0]), Math.floor(y+this.offset[1]), config.tileSize, config.tileSize)
+            }
+        }
+        if (this.thunderTimer < 0) {
+            this.thunderTimer = Math.random() * this.thunderTimerMax;
+            this.thunderFlash = Math.random();
+        } else {
+            this.thunderTimer -= delta;
+        }
+        if (this.thunderFlash > 0) {
+            this.thunderFlash -= delta * this.flashSpeed;
+            ctx.save()
+            ctx.globalAlpha = this.thunderFlash;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, config.width, config.height);
+            ctx.restore()
+        }
+
+    }
+}
+
+const Player = {
+    prevent: [],
+    canMove: true,
+    invis: false,
+    noclip: false,
+    aabb: [0,0,15,15],
+    spr : 35,
+    r   : 0,
+    setpos(pos) {
+        this.aabb = [pos[0],pos[1],pos[0]+15,pos[1]+15]
+    },
+    process: function() {
+        if (this.canMove) {
+            // needs a process function because it renders in between layers of the world.
+            // if player movement occurs in between drawing layers of the world, then the layers will become disconnected
+            let inputDir = [0,0];
+            if (Actions["move_up"]) {
+                inputDir[1] -= 1;
+            }
+            if (Actions["MOVE_LEFT"]) {
+                inputDir[0] -= 1;
+            }
+            if (Actions["MOVE_DOWN"]) {
+                inputDir[1] += 1;
+            }
+            if (Actions["MOVE_RIGHT"]) {
+                inputDir[0] += 1;
+            }
+            switch (inputDir) {
+                case [1,0]:
+                    this.r = 0;
+                    break;
+                case [0,1]:
+                    this.r = 1;
+                    break;
+                case [-1,0]:
+                    this.r = 2;
+                    break;
+                case [0,-1]:
+                    this.r = 3;
+                    break;
+            }
+            let x1 = this.aabb[0];
+            let y1 = this.aabb[1];
+            let x2 = this.aabb[2];
+            let y2 = this.aabb[3];
+            let X1 = this.aabb[0] + inputDir[0];
+            let X2 = this.aabb[2] + inputDir[0];
+            if (this.noclip || !aabbWorld([X1,y1,X2,y2], 0)) {
+                this.aabb[0] = X1;
+                this.aabb[2] = X2;
+                Mouse.worldX += inputDir[0];
+            }
+            let Y1 = this.aabb[1] + inputDir[1];
+            let Y2 = this.aabb[3] + inputDir[1];
+            if (this.noclip || !aabbWorld([x1, Y1,x2,Y2], 0)) {
+                this.aabb[1] = Y1;
+                this.aabb[3] = Y2;
+                Mouse.worldY += inputDir[1];
+            }
+        }
+
+        Camera.x1 = this.aabb[0] - config.width / 2 + 8;
+        Camera.y1 = this.aabb[1] - config.height / 2 + 8;
+        Camera.x2 = Camera.x1 + config.width + 8;
+        Camera.y2 = Camera.y1 + config.height + 8;
+    },
+    draw: function () {
+        if (this.invis) return;
+        drawSprite(this.spr, this.aabb[0]-Camera.x1, this.aabb[1]-Camera.y1, 16, 16);
+    }
+}
+
+const Camera = {"x1":0,"y1":0,"x2":0,"y2":0}; // TODO : switch to list aabb format
+
+////////////////////////////
+// COMMANDS AND SCRIPTING //
+////////////////////////////
+
+const CommandInterpreter = {
+    hasRanInitScript: false,
+    editScript : null, // name of the script currently being edited
+    execute(line) {
+        if (this.editScript) {
+            if (line === ".end") {
+                this.editScript = null;
+                return "stopped editing script."
+            }
+            Scripts[this.editScript] += line + "\n";
+        } else {
+            for (let command of Commands) {
+                if (line.slice(0, command.pattern.length) === command.pattern) {
+                    let result;
+                    if (command.nArgs > 0) {
+                        let args = line.split(" ").slice(command.pattern.split(" ").length);
+                        let args2 = [];
+                        // 0 normal
+                        // 1 reading string argument
+                        let strArg;
+                        let readStr = false;
+                        for (let arg of args) {
+                            if (readStr) {
+                                if (arg.endsWith("\"")) {
+                                    strArg = strArg + " " + arg.substring(0, arg.length-1);
+                                    args2.push(strArg);
+                                    console.log("strArg: "+strArg);
+                                    readStr = false;
+                                } else {
+                                    strArg += " " + arg;
+                                }
+                            } else {
+                                if (arg.at(0) === "\"") {
+                                    strArg = arg.slice(1);
+                                    readStr = true;
+                                } else {
+                                    let parsed = Number(arg);
+                                    if (!isNaN(parsed) ) {args2.push(parsed)}
+                                    else {
+                                        let bparsed = {"false":false,"true":true}[arg];
+                                        if (typeof bparsed === "boolean") {args2.push(bparsed);} else {
+                                            args2.push(arg);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        result = command.func(args2);
+                    } else { result = command.func();}
+                    if (!result) return;
+                    console.log(result);
+                    return result;
+                }
+            }
+            return "command not found."
+        }
+    },
+    executeScript(script) {
+        let lines = script.split("\n");
+        for (let line of lines) this.execute(line);
+    }
+}
+const Scripts = {};
+/* COMMAND FORMAT
+{
+    pattern: "",
+    nArgs: 0,
+    func: (args) => { return "command was executed."; }
+}
+ */
+const Commands = [
+    {
+        pattern: ".ent mod",
+        nArgs: 1,
+        func: (args) => { Entities[CommandInterpreter.focusEntity].modify(args); }
+    },
+    {
+        pattern: ".prevent",
+        nArgs: 1,
+        func: (args) => { if (!Player.prevent.includes(args[0])) { Player.prevent.push(args[0]); } }
+    },
+    {
+        pattern: ".allow",
+        nArgs: 1,
+        func: (args) => { if (Player.prevent.includes(args[0])) { Player.prevent.splice(Player.prevent.indexOf(args[0]),1); } }
+    },
+    {
+        pattern: ".ent focus", nArgs: 1,
+        func: (args) => { CommandInterpreter.focusEntity = parseInt(args[0]); }
+    },
+    {
+        pattern: ".ent delete", nArgs: 0,
+        func: (args) => { Entities.splice(CommandInterpreter.focusEntity, 1); }
+    },
+    {
+        pattern: "#",
+        nArgs: 0,
+        func: (args) => {  }
+    },
+    {
+        pattern: ".export ents", // .export ents <script_name>
+        nArgs: 1,
+        func: (args) => {
+            let script = "";
+            for (let ent of Entities) {
+                script += ent.toScript() + "\n";
+            }
+            Scripts[args[0]] = script;
+        }
+    },
+    {
+        pattern: ".ent create",
+        nArgs: 1,
+        func: (args) => {
+            spawn(args);
+            CommandInterpreter.focusEntity = Entities.length - 1;
+        }
+    },
+    {
+        pattern: ".invis",
+        nArgs: 1,
+        func: (args) => { Player.invis = {"0":0,"1":1}[args[0]]; }
+    },
+    {
+        pattern: ".canmove",
+        nArgs: 1,
+        func: (args) => { Player.canMove = {"0":0,"1":1}[args[0]]; }
+    },
+    {
+        pattern: ".tp",
+        nArgs: 2,
+        func: (args) => { Player.setpos( [parseInt(args[0]), parseInt(args[1])] ); }
+    },
+    {
+        pattern: ".mpos", nArgs: 0, func: (args) => { return Mouse.x + " " + Mouse.y + " " + Mouse.worldX + " " + Mouse.worldY;}
+    },
+    {
+        pattern: ".torch", nArgs: 0,
+        func: (args) => { LightFX.enabled = !LightFX.enabled; }
+    },
+    {
+        pattern: ".rain", nArgs: 0,
+        func: (args) => { RainFX.enabled = !RainFX.enabled; }
+    },
+    {
+        pattern: ".pagebg", nArgs: 1,
+        func: (args) => { document.body.style.backgroundColor = args[0]; }
+    },
+    {
+        pattern: ".cfg",
+        nArgs: 2,
+        func: (args) => {
+            config[args[0]] = parseInt(args[1]);
+            if (canvas.width !== config.width * config.scalex) {
+                canvas.width   = config.width * config.scalex;
+
+            }
+            if (canvas.height !== config.height * config.scaley) {
+                canvas.height   = config.height * config.scaley;
+            }
+            ctx.imageSmoothingEnabled = false;
+            return "updated canvas!";
+
+        }
+    },
+    {
+        pattern: ".tl", nArgs: 1,
+        func: (args) => {
+            let arg = parseInt(args[0]);
+            if (-1 < arg < map.layers)
+                map.layerVis[parseInt(args[0])] = !map.layerVis[parseInt(args[0])]
+            else return "invalid layer.";
+        }
+    },
+    {
+        pattern: ".export map", nArgs: 0,
+        func: (args) => { map.export(); }
+    },
+    {
+        pattern: ".exportjs map", nArgs: 0,
+        func: (args) => { map.export(true); }
+    },
+    {pattern: ".import map", nArgs: 0, func: (args) => {importMap();}},
+    {
+        pattern: ".export scripts",
+        nArgs: 0,
+        func: (args) => {
+            //if (!Scripts[args[0]]) return "script not found.";
+
+            let script = "";
+
+            for (let scriptName of Object.keys(Scripts)) {
+                script += ".edit " + scriptName + "\n" + Scripts[scriptName] + "\n" + ".end\n";
+            }
+
+            exportData(script, "all.txt")
+        }
+    },
+    {
+        pattern: ".exportjs scripts",
+        nArgs: 0,
+        func: (args) => {
+
+            let script = "";
+
+            for (let scriptName of Object.keys(Scripts)) {
+                script += ".edit " + scriptName + "\n" + Scripts[scriptName] + ".end\n\n";
+            }
+
+            exportData("const PKG_ALLSCRIPTS = `" + script + "`;", "allscripts.js")
+        }
+    },
+    {
+        pattern: ".list scripts",
+        nArgs: 0,
+        func: (args) => {
+            for (let scriptName of Object.keys(Scripts)) {
+                DevConsole.history.push([scriptName,lastTimestamp])
+            }
+        }
+    },
+    {
+        pattern: ".list ents",
+        nArgs: 0,
+        func: (args) => {
+            for (let ent of Entities) {
+                DevConsole.history.push([ent.type,lastTimestamp]);
+            }
+        }
+    },
+    {
+        pattern: ".editor",
+        nArgs: 1,
+        func: (args) => {
+            if (Scripts[args[0]]) {
+                Dialog.push(new DialogBox(0, 16, config.width, config.height-16,"#334"))
+                Dialog.at(-1).lines = Scripts[args[0]].split("\n");
+                ActiveDialogBox = Dialog.length-1;
+                Dialog.at(-1).inputMode = true;
+                DevConsole.focused = false;
+                typing = true;
+                return "press tab to stop editing"
+            } else return "no such script exists"
+        }
+    },
+    {
+        pattern: ".db s",
+        nArgs: 1,
+        func: (args) => {
+            Scripts[args[0]] = Dialog[ActiveDialogBox].lines.join("\n");
+            return "saved. awesome"
+        }
+    },
+    {
+        pattern: ".delete script",
+        nArgs: 1,
+        func: (args) => {
+            if (Scripts[args[0]]) {
+                delete Scripts[args[0]];
+                return "deleted"
+            } else return "no such script exists"
+        }
+    },
+    {
+        pattern: ".export script",
+        nArgs: 1,
+        func: (args) => {
+            if (!Scripts[args[0]]) return "script not found."; // TODO : my senses are alarmed about new line fuckery
+            let script = ".edit " + args[0] + "\n" + Scripts[args[0]] + "\n" + ".end";
+            exportData(script, args[0])
+        }
+    },
+    {
+        pattern: ".export raw",
+        nArgs: 1,
+        func: (args) => {
+            if (!Scripts[args[0]]) return "script not found.";
+            exportData(Scripts[args[0]],args[0]+".txt");
+        }
+    },
+    {
+        pattern: ".f", nArgs: 0,
+        func: (args) => {
+            for (let x = brush.pos1[0]; x <= brush.pos2[0]; x++) {
+                for (let y = brush.pos1[1]; y <= brush.pos2[1]; y++) {
+                    map.set(x, y, brush.layer, [brush.tileId, brush.rotation])
+                }
+            }
+        }
+    },
+    {
+        pattern: ".1", nArgs: 0,
+        func: (args) => { brush.pos1 = [Math.floor(Mouse.worldX/config.tileSize),Math.floor(Mouse.worldY/config.tileSize)]; }
+    },
+    {
+        pattern: ".2", nArgs: 0,
+        func: (args) => { brush.pos2 = [Math.floor(Mouse.worldX/config.tileSize),Math.floor(Mouse.worldY/config.tileSize)]; }
+    },
+    {
+        pattern: ".l", nArgs: 1,
+        func: (args) => { if ([0,1,2,3].includes(parseInt(args[0]))) brush.layer = parseInt(args[0]); else return "invalid layer"; }
+    },
+    {
+        pattern: ".pos", nArgs: 0,
+        func: (args) => { return Player.aabb[0] + " " + Player.aabb[1]; }
+    },
+    {
+        pattern: ".t",
+        nArgs: 1,
+        func: (args) => { brush.tileId = parseInt(args[0]); }
+    },
+    {
+        pattern: ".db new",
+        nArgs: 4,
+        func: (args) => {
+            let x = parseInt(args[0]);
+            let y = parseInt(args[1]);
+            let w = parseInt(args[2]);
+            let h = parseInt(args[3]);
+            Dialog.push(new DialogBox(x,y,w,h));
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].focused = false;
+            }
+            Dialog[Dialog.length - 1].focused = true;
+            ActiveDialogBox = Dialog.length - 1;
+            return "new dialog box created."
+        }
+    },
+    {
+        pattern: ".db focus",
+        nArgs: 1,
+        func: (args) => {
+            let arg = parseInt(args[0]);
+            if (arg >= Dialog.length) return "index out of bounds"
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].focused = false;
+            }
+            if (arg > -1) Dialog[arg].focused = true;
+            ActiveDialogBox = arg;
+            return "switched active dialog box";
+        }
+    },
+    {
+        pattern: ".db delete",
+        nArgs: 0,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Dialog.splice(ActiveDialogBox, 1);
+                ActiveDialogBox = -1;
+                return "deleted dialog box";
+            } else return "no dialog box selected to delete";
+        }
+    },
+
+
+    {
+        pattern: ".db edit",
+        nArgs: 0,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].inputMode = true;
+                DevConsole.focused = false;
+                typing = true;
+                return "press tab to stop editing dialog box"
+            }
+            else return "no dialog box is selected";
+        }
+    },
+    {
+        pattern: ".db mode",
+        nArgs: 1,
+        func: (args) => { if (ActiveDialogBox > -1) {Dialog[ActiveDialogBox].mode = args[0]} else return "no dialog box selected" }
+    },
+    {
+        pattern: ".db mod",
+        nArgs: 1,
+        func: (args) => { if (ActiveDialogBox > -1) {Dialog[ActiveDialogBox].mode = args[0]} else return "no dialog box selected" }
+    },
+    {
+        pattern: ".db cursor",
+        nArgs: 2,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                let x = parseInt(args[0]);
+                let y = parseInt(args[1]);
+                Dialog[ActiveDialogBox].crsPos[0] = x;
+                Dialog[ActiveDialogBox].crsPos[1] = y;
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".db write",
+        nArgs: 1,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].lines.push(args[0]);
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".db choice",
+        nArgs: 5,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                let x = Dialog[ActiveDialogBox].crsPos[0];
+                let y = Dialog[ActiveDialogBox].crsPos[1];
+                let choice = [x,y,parseInt(args[0]),parseInt(args[1]),parseInt(args[2]),parseInt(args[3]),args[4]]
+                Dialog[ActiveDialogBox].choices.push(choice);
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".db reset",
+        nArgs: 0,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].age = 0;
+                Dialog[ActiveDialogBox].printing = true;
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".db toscript",
+        nArgs: 1,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Scripts[args[0]] = Dialog[ActiveDialogBox].toScript();
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".db x",
+        nArgs: 1,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].x = parseInt(args[0]);
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".db y",
+        nArgs: 1,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].y = parseInt(args[0]);
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".db w",
+        nArgs: 1,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].w = parseInt(args[0]);
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".db h",
+        nArgs: 1,
+        func: (args) => {
+            if (ActiveDialogBox > -1) {
+                Dialog[ActiveDialogBox].h = parseInt(args[0]);
+            } else return "no dialog box selected";
+        }
+    },
+    {
+        pattern: ".r",
+        nArgs: 0,
+        func: (args) => { brush.rotation = ( brush.rotation + 1 ) % 4; return "command was executed."; }
+    },
+    {
+        pattern: ".noclip",
+        nArgs: 0,
+        func: (args) => { Player.noclip = !Player.noclip; return Player.noclip ? "noclip enabled." : "noclip disabled."; }
+    },
+    {
+        pattern:".print",
+        nArgs: 1,
+        func: (args) => {
+            console.log(args.join(" "));
+            return "";
+        }
+    },
+    {
+        pattern:".edit",
+        nArgs:1,
+        func: (args)=>{
+            CommandInterpreter.editScript = args[0];
+            if (!Scripts[args[0]]) Scripts[args[0]] = "";
+            return "editing script";
+        }
+    },
+    {
+        pattern:".end",
+        nArgs:0,
+        func: ()=>{
+            // the actual implementation for stopping the editing of a script is found in the CommandInterpreter execute() function
+            return "no script is currently being edited.";
+        }
+    },
+    {
+        pattern:".exec",
+        nArgs:1,
+        func: (args)=>{
+            if (Scripts[args[0]]) {
+                CommandInterpreter.executeScript(Scripts[args[0]]);
+                if (args[0] === "init") CommandInterpreter.hasRanInitScript = true;
+                return "a script was executed.";
+            } else {
+                return "script not found.";
+            }
+        }
+    }
+]
+const DevConsole = {
+    visible     : false,
+    focused     : false,
+    history     : [],
+    textField   : "",
+    handleEvent : function(e){
+        if (e.key === "Enter") {
+            e.preventDefault();
+            this.history.push([this.textField, lastTimestamp])
+            let command = this.textField.slice(0);
+            this.textField = "";
+            this.focused = false;
+            typing = false;
+            let result = CommandInterpreter.execute(command)
+            if (result) this.history.push([result, lastTimestamp]);
+        } else if (e.key === "Backspace") {
+            //e.preventDefault();
+            this.textField = this.textField.slice(0,this.textField.length-1);
+        } else if (config.fontValidChars.includes(e.key)) {
+            this.textField += e.key;
+        }
+    },
+    draw        : function(e){
+
+        if (!typing && Actions["CONSOLE"]) {
+            this.textField = ".";
+            this.visible = true;
+            this.focused = true;
+            typing = true;
+        }
+
+        if (this.visible) {
+            printText(this.textField,0,0,999);
+            for (let i = 0; i < this.history.length && i < 6; i++) {
+                let age = (lastTimestamp - this.history.at(-(i+1))[1])
+                const MAX_AGE = 6000;
+                if (age > MAX_AGE) { return; }
+                ctx.save()
+                ctx.globalAlpha = 1 - age/MAX_AGE;
+                printText(this.history.at(-(i+1))[0],0,8*(i+1))
+                ctx.restore()
+            }
+        }
+    },
+}
+
+//////////////
+// ENTITIES //
+//////////////
+
+const EntityTypes = {
+    npc : {
+        requiredFields : {
+            "spr": "number",
+            "x"  : "number",
+            "y"  : "number",
+            "w"  : "number",
+            "h"  : "number"
+        },
+        optionalFields : {
+            "visible"           : true,
+            "enabled"           : true,
+            "anim_frames"       : 1,
+            "anim_step"         : 1,
+            "anim_speed"        : 0.5,
+            "anim_current"      : 0,
+            "anim_on_complete"  : "",
+            'anim_looping'      : true,
+            "path_x"            : 0,
+            "path_y"            : 0,
+            "path_speed"        : 0,
+            "path_on_complete"  : ""
+        },
+        process() {
+
+            if (this.anim_frames > 1) {
+                if (this.anim_current < this.anim_frames) {
+                    this.anim_current += this.anim_speed * delta;
+                    if (this.anim_current >= this.anim_frames) {
+
+                        CommandInterpreter.execute(this.anim_on_complete)
+                        if (this.anim_looping) this.anim_current = 0;
+                    }
+                }
+            }
+        },
+        draw() {
+            if (!this.visible) return;
+            let aabb = [this.x, this.y, this.x+this.w,this.y+this.h]
+            let cam  = [Camera.x1, Camera.y1, Camera.x2, Camera.y2]
+            if (aabbCheck(aabb, cam))
+                drawSprite(
+                    this.spr + ((this.anim_frames > 1) ? (Math.floor(this.anim_current) * this.anim_step) : 0), 
+                    this.x - Camera.x1, 
+                    this.y - Camera.y1, 
+                    this.w, 
+                    this.h
+                )
+        }
+    },
+    interact : {
+        requiredFields : {
+            x  : "number",
+            y  : "number",
+            w  : "number",
+            h  : "number",
+            cmd: "string"
+        },
+        optionalFields : {
+            visible      : true,
+            enabled      : true,
+            intersecting : false
+        },
+        process() {
+            if (!this.enabled) return;
+            if (!this.intersecting) {
+                if (aabbCheck(this.aabb,Player.aabb)) this.intersecting = true;
+            } else {
+
+                if (!aabbCheck(this.aabb,Player.aabb)) this.intersecting = false;
+                else if (Actions["interact"]) {
+                    Actions["interact"] = false;
+                    CommandInterpreter.execute(this.cmd);
+                }
+            }
+        },
+        init() {
+            this.aabb = [this.x, this.y, this.x + this.w, this.y + this.h];
+        }
+    }
+}
+
+function spawn(args) {
+
+    let ent = {};
+    if (Object.keys(EntityTypes).includes(args[0])) {
+
+
+
+        ent.type = args[0];
+        ent.modify = function (args) {
+            for (let i = 0; i < args.length; i += 2) {
+                let key = args[i].toString();
+                let value = args[i+1];
+
+                let optKeys = Object.keys(EntityTypes[this.type].optionalFields);
+                let reqKeys = Object.keys(EntityTypes[this.type].requiredFields);
+                let fieldExists = optKeys.includes(key) || reqKeys.includes(key);
+                if (fieldExists && typeof value === typeof this[key]) {
+                    this[key] = value;
+                }
+            }
+        }.bind(ent)
+
+        let optFields = EntityTypes[ent.type].optionalFields;
+        let nOptFields = Object.keys(optFields).length;
+        let reqFields = EntityTypes[ent.type].requiredFields;
+        let nReqFields = Object.keys(reqFields).length;
+
+        for (let i = 0; i < nReqFields; i++) { 
+            if (typeof args[i + 1] === reqFields[Object.keys(reqFields)[i]]) {
+
+                ent[Object.keys(reqFields)[i]] = args[i + 1];
+            } else {  
+
+                return;
+            }
+        }
+
+        for (let i = 0; i < nOptFields; i++) {
+            let key = Object.keys(optFields)[i];
+            ent[key] = optFields[key];  
+        }
+        ent.modify(args.slice(1 + nReqFields));
+        ent.toScript = function () {
+            let optionalFields = EntityTypes[this.type].optionalFields;
+            let requiredFields = EntityTypes[this.type].requiredFields;
+            let line = ".ent create " + this.type;
+            for (let field of Object.keys(requiredFields)) {
+                line = line + " ";
+                if (typeof this[field] === String) line = line + `"`;
+                line = line + this[field];
+                if (typeof this[field] === String) line = line + `"`;
+            }
+            for (let field of Object.keys(optionalFields)) {
+                let defaultValue = EntityTypes[this.type].optionalFields[field];
+                if (this[field] !== defaultValue) {
+                    line = line + " " + field + " ";
+                    if (typeof this[field] === String) line = line + `"`;
+                    line = line + this[field];
+                    if (typeof this[field] === String) line = line + `"`;
+                }
+            }
+            return line;
+        }.bind(ent);
+        ent.draw    = EntityTypes[ent.type].draw    ? EntityTypes[ent.type].draw.bind(ent) : function () {}.bind(ent);
+        ent.process = EntityTypes[ent.type].process ? EntityTypes[ent.type].process.bind(ent) : function () {}.bind(ent);
+        ent.init    = EntityTypes[ent.type].init ? EntityTypes[ent.type].init.bind(ent) : function () {}.bind(ent);
+        ent.init();
+        Entities.push(ent);
+    }
+}
+
+/////////////////
+// DIALOG + UI //
+/////////////////
+
+let ActiveDialogBox = -1; // TODO : could be encapsulated further
+
+class DialogBox {
+	constructor(x,y,w,h, bgColor="#000000", speed=0.01) {
+		this.x = x;
+		this.y = y;
+		this.w = w;
+		this.h = h;
+        this.rows = 128;
+        this.cols = 128;
+		this.bgColor = bgColor;
+		this.speed = speed;
+		this.age = 0;
+		this.messageLength = 0; // this is useful. TODO: update messageLength when typing.
+		this.printing = false;
+		this.showCursor = true;
+		this.crsPos = [0,0];
+        this.panPos = [0,0];
+		this.selection = 0;
+        this.focused = false;
+        this.inputMode = false;
+		this.mode = "overtype";
+        this.lines = [];
+		this.choices = [];
+	}
+	confirm() {
+        if (this.mode === "menu" && this.selection < this.choices.length)
+            CommandInterpreter.execute(".exec " + this.choices[this.selection][6]);
+	}
+    toScript() {
+        let script = ".db new " + this.x + " " + this.y + " " + this.w + " " + this.h;
+        for (let line of this.lines) {
+            script += "\n" + line;
+        }
+        script += "\n.db mode "+this.mode;
+        for (let choice of this.choices) {
+            script = script + "\n.db cursor " + choice[0] + " " + choice[1];
+            script = script + "\n.db choice " + choice[2] + " " + choice[3] + " " + choice[4] + " " + choice[5] + " " + choice[6];
+        }
+        script = script + "\n.db cursor " + this.crsPos[0] + " " + this.crsPos[1];
+        return script;
+    }
+	handleEvent(e) {
+        if (this.inputMode) {
+            e.preventDefault();
+            console.log(this.inputMode);
+            if (config.inputMap[e.key]) {
+                if      (config.inputMap[e.key] === "NAV_UP") this.navigate("up");
+                else if (config.inputMap[e.key] === "NAV_LEFT") this.navigate("left");
+                else if (config.inputMap[e.key] === "NAV_DOWN") this.navigate("down");
+                else if (config.inputMap[e.key] === "NAV_RIGHT") this.navigate("right");
+            }
+
+            if (config.fontValidChars.includes(e.key)) {
+                if (this.crsPos[1] >= this.lines.length) { // situ: 2 lines. index 4 (row 5)
+                    // create enough lines
+                    let count = (this.crsPos[1] - this.lines.length + 1);
+                    for (let i = 0; i < count ; i++) {
+                        this.lines.push("");
+                    }
+                }
+                if (this.crsPos[0] >= this.lines[this.crsPos[1]].length) { // situation: line length 0. index 0
+                    this.lines[this.crsPos[1]] += " ".repeat(this.crsPos[0]-this.lines[this.crsPos[1]].length+1);
+                }
+                let arr = this.lines[this.crsPos[1]].split("");
+                arr[this.crsPos[0]] = e.key;
+                this.lines[this.crsPos[1]] = arr.join("");
+                this.navigate("right");
+            } else if (e.key === "Enter") {
+
+                let splitlines = this.lines[this.crsPos[1]].split("");
+                this.lines.splice(this.crsPos[1], 0, "")
+            }
+            else if (e.key === "Tab") {
+                e.preventDefault();
+                this.inputMode = false;
+                typing = false;
+            } else if ( e.key === "Backspace" ) {
+                this.text = this.text.split('');
+                this.text[cursorIndex-1] = " ";
+                this.text = this.text.join('')
+                if (cursorIndex === this.messageLength) {this.messageLength--;}
+                this.navigate("left");
+            }
+        }
+	}
+	navigate(direction) {
+		if (this.mode === "menu") {
+			this.selection = this.choices[this.selection][ {"left":2,"up":3,"right":4,"down":5}[direction] ];
+			this.crsPos = [this.choices[this.selection][0], this.choices[this.selection][1]];
+		} else if (this.mode === "overtype") {
+			switch (direction) {
+                case "left":
+                    this.crsPos[0] --;
+                    let boundaryCrossed = this.crsPos[0] < 0;
+                    let atTopLine = this.crsPos[1] === 0;
+                    if (!atTopLine && boundaryCrossed) {
+                        this.crsPos[0] = this.cols-1;
+                        this.crsPos[1] -= 1;
+                        this.panPos[0] = this.cols - Math.floor(this.w / config.fontSize);
+                    } else if (boundaryCrossed) {
+                        this.crsPos[0] = 0;
+                    }
+                    let shouldPan = this.crsPos[0] - this.panPos[0] < 0;
+                    if (shouldPan) this.panPos[0] -= 1;
+                    break;
+                case "right":
+                {
+                    this.crsPos[0]++;
+                    let boundaryCrossed = this.crsPos[0] >= this.cols;
+                    let atBottomLine = this.crsPos[1] === this.rows - 1;
+                    if (!atBottomLine && boundaryCrossed) {
+                        this.crsPos[0] = 0;
+                        this.panPos[0] = 0;
+                        this.crsPos[1] += 1;
+                    } else if (boundaryCrossed) {
+                        this.crsPos[0] -= 1;
+                    }
+                    let shouldPan = this.crsPos[0] >= Math.floor(this.w / config.fontSize) + this.panPos[0];
+                    if (shouldPan) this.panPos[0] += 1;
+                }
+                    break;
+                case "down":
+                {
+                    if (this.crsPos[1] !== this.rows-1) this.crsPos[1] += 1;
+                    let shouldPan = this.crsPos[1] === Math.floor(this.h / config.fontSize) + this.panPos[1];
+                    if (shouldPan) this.panPos[1] += 1;
+                    break;
+                }
+                case "up":
+                {
+                    if (this.crsPos[1] !== 0) this.crsPos[1] -= 1;
+                    let shouldPan = this.crsPos[1] - this.panPos[1] < 0;
+                    if (shouldPan) this.panPos[1] -= 1;
+                    break;
+                }
+
+            }
+		}
+	}
+    write() {}
+	draw(){
+        if (this.focused) {
+            if (Actions["NAV_UP"]) {
+                this.navigate("up");
+                Actions["NAV_UP"] = false;
+            }
+            if (Actions["NAV_LEFT"]) {
+                this.navigate("left");
+                Actions["NAV_LEFT"] = false;
+            }
+            if (Actions["NAV_DOWN"]) {
+                this.navigate("down");
+                Actions["NAV_DOWN"] = false;
+            }
+            if (Actions["NAV_RIGHT"]) {
+                this.navigate("right");
+                Actions["NAV_RIGHT"] = false;
+            }
+            if (Actions["CONFIRM"]) {
+                Actions["CONFIRM"] = false;
+                if (this.age > 0) this.confirm();
+            }
+        }
+		this.age += delta;
+		ctx.save();
+		ctx.fillStyle = "#CCCCCC";
+		ctx.fillRect(this.x+2, this.y+2, this.w, this.h);
+        ctx.fillStyle = this.bgColor;
+		ctx.fillRect(this.x, this.y, this.w, this.h);
+
+        let scrollw = Math.floor((this.w * this.w ) / (this.cols * config.fontSize))
+        let scrollx = Math.floor((this.panPos[0] * this.w)/this.cols)
+
+        ctx.fillStyle = "red"
+        ctx.fillRect(this.x+scrollx, this.y-2, scrollw, 2);
+
+		ctx.restore();
+
+        let cw = Math.floor(this.w/config.fontSize);
+        let panx = this.panPos[0];
+        let pany = this.panPos[1];
+        let nRows = Math.floor(this.h / config.fontSize);
+        // issue: prints lots of unnecessary space characters
+        for (let i = pany; i < Math.min(nRows + pany, this.lines.length); i++) {
+            printText(this.lines[i].slice(panx, cw + panx), this.x, this.y + (i-this.panPos[1]) * config.fontSize)
+        }
+
+		if (this.showCursor && this.age % 1000 >= 500)
+            printText("█",(this.crsPos[0]-this.panPos[0])*config.fontSize+this.x,(this.crsPos[1]-this.panPos[1])*config.fontSize+this.y, 8, 8)
+	}
+} // TODO: FIX: a message that takes up the full textbox will push the cursor out of bounds after animating
+
+const Dialog = [];
+const Entities = []; // TODO : move this to other section
+
+//////////////
+// TILE MAP //
+//////////////
+
+class TileMap {
+    constructor(w,h,layers,dataSize) {
+        this.width    = w;
+        this.height   = h;
+        this.layers   = layers;
+        this.dataSize = dataSize;
+        this.buffer   = new ArrayBuffer(w * h * layers * dataSize);
+        this.data     = new Uint8Array(this.buffer);
+        this.layerVis = Array(layers).fill(true);
+    }
+    indexOf (x, y, z) {
+        return (y * this.width + x + this.width * this.height * z) * this.dataSize;
+    }
+    set     (x, y, z, data) {
+        let idx = this.indexOf(x, y, z);
+        for (let i = 0; i < this.dataSize; i++) {
+            this.data[idx+i] = data[i];
+        }
+    }
+    get     (x, y, z) {
+        let idx = this.indexOf(x, y, z);
+        let result = [];
+        for (let i = 0; i < this.dataSize; i++) {
+            result.push(this.data[idx+i]);
+        }
+        return result;
+    }
+    drawLayers    (z, n) {
+        for (let i = z; i < z+n; i++) {
+            this.drawLayer(i)
+        }
+    }
+    export  (js=false) {
+        if (js) exportDataJs(this.data,"world.map.js",'application/octet-stream')
+        else exportData(this.buffer,"world.map",'application/octet-stream')
+    }
+    drawLayer(layer) {
+        if (!this.layerVis[layer]) return;
+        // convert camera bounding box pixel coordinates to tile coordinates
+        let	x1 = Math.floor(Camera.x1 / config.tileSize);
+        let	y1 = Math.floor(Camera.y1 / config.tileSize);
+        let	x2 = Math.floor(Camera.x2 / config.tileSize);
+        let	y2 = Math.floor(Camera.y2 / config.tileSize);
+        // clamp to world boundaries
+        x1 = Math.max(0,x1);
+        y1 = Math.max(0,y1);
+        x2 = Math.min(map.width ,x2);
+        y2 = Math.min(map.height,y2);
+        // draw tiles
+        for     (let y = y1; y <= y2; y++) {
+            for (let x = x1; x <= x2; x++) {
+                let tile = map.get(x, y, layer)
+                let screenX = Math.floor( x * config.tileSize - Camera.x1 );
+                let screenY = Math.floor( y * config.tileSize - Camera.y1 );
+                drawSprite(tile[0], screenX, screenY, config.tileSize, config.tileSize, tile[1] * Math.PI / 2 );
+            }
+        }
+    }
+}
+let map = new TileMap(config.mapWidth, config.mapHeight, config.mapLayers, config.mapDataSize);
+
+function importMap() {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.style.display = "none";
+    document.body.appendChild(fileInput);
+    fileInput.addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const fileBuffer = await file.arrayBuffer();
+        const fileData	 = new Uint8Array(fileBuffer);
+        const length = Math.min(map.data.length, fileData.length);
+        map.data.set(fileData.subarray(0, length), 0);
+    });
+    fileInput.click();
+    document.body.removeChild(fileInput);
+}
+
+function importPkg() {
+    if (typeof package !== 'undefined') {
+        map.data.setFromHex(package);
+    }
+}
+importPkg();
+
+///////////////
+// COLLISION //
+///////////////
+function aabbCheck(a, b) {
+	return (a[0] < b[2] && a[2] > b[0]) && (a[1] < b[3] && a[3] > b[1]);
+}
+function aabbWorld(aabb, layer) {
+    let x1 = Math.floor( aabb[0] / config.tileSize );
+    let y1 = Math.floor( aabb[1] / config.tileSize );
+    let x2 = Math.floor( aabb[2] / config.tileSize );
+    let y2 = Math.floor( aabb[3] / config.tileSize );
+    for (let x = x1;x <= x2; x++) {
+        for (let y = y1;y <= y2; y++) {
+            let tile = map.get(x, y, layer);
+            if ([4,11,13].includes(tile[0])) return true;
+        }
+    }
+    return false;
+}
+///////////////
+// RENDERING //
+///////////////
+// TODO : this function performs lots of calls to drawImage. see what can be done to reduce this
+// TODO : could use a lot of feature additions
+function printText(text, x, y, dx=1000, dy=1000) {
+	let carriage = [x,y];
+	for (let char of text) {
+		if (config.fontValidChars.includes(char)) {
+			let charIndex = config.fontValidChars.indexOf(char);
+			ctx.drawImage(sprites,
+					config.fontX + config.fontSize * (charIndex % config.fontColumns),
+					config.fontY + config.fontSize * (Math.floor(charIndex / config.fontColumns)),
+                    config.fontSize,
+                    config.fontSize,
+					carriage[0],
+					carriage[1],
+                    config.fontSize,
+                    config.fontSize)
+		}
+		carriage[0] += config.fontSize;
+		if (carriage[0] + config.fontSize > x + dx) {
+            carriage[1] += config.fontSize;
+			carriage[0] = x ;
+		}
+	}
+}
+
+function drawSprite(sprite, dx, dy, w, h, r=0, offsetX=0, offsetY=0) {
+    let sx = config.tileSize * ( sprite % config.tileColumns)
+    let sy = config.tileSize * ( Math.floor(sprite / config.tileColumns))
+    ctx.save();
+    ctx.translate(dx + w / 2, dy + h / 2);
+    ctx.rotate(r)
+    ctx.drawImage(
+        sprites,
+        sx,
+        sy,
+        w,
+        h,
+        0-w/2,
+        0-h/2,
+        w,
+        h
+    );
+    ctx.restore();
+}
+
+///////////////
+// MAIN LOOP //
+///////////////
+
+function gameLoop(timestamp) {
+	delta = timestamp - lastTimestamp;
+	lastTimestamp = timestamp;
+    Player.process();
+	// BEGIN RENDER
+    ctx.save();
+    ctx.scale(config.scalex, config.scaley);
+	ctx.fillStyle = "#222233"; // BACKGROUND COLOR
+	ctx.fillRect(0,0,config.width,config.height); // THIS CAN BE REMOVED TO IMPROVE PERFORMANCE
+	// DRAW WORLD
+    map.drawLayers(0,3);
+	// DISPLAY CHARACTER
+	const directions = {"right":0, "down":1, "left":2, "up":3};
+    Player.draw();
+	// DISPLAY TOP LAYER ( SHOULD DISPLAY ABOVE PLAYER )
+	map.drawLayers(3,1);
+	// DISPLAY TILE CURSOR
+    let ptrX = Math.floor(Mouse.worldX/config.tileSize)*config.tileSize-Camera.x1
+    let ptrY = Math.floor(Mouse.worldY/config.tileSize)*config.tileSize-Camera.y1
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    drawSprite(brush.tileId, ptrX, ptrY, config.tileSize, config.tileSize, brush.rotation * Math.PI / 2);
+    ctx.restore();
+
+    // ENTITIES
+    for (let i=0;i<Entities.length;i++) { Entities[i].process(i); }
+    for (let i=0;i<Entities.length;i++) { Entities[i].draw(i); }
+
+    RainFX.draw();
+    LightFX.draw();
+
+    for (const DialogBox of Dialog) {
+        DialogBox.draw();
+    }
+	//if (showSprites) {
+	//	if (inputState.NAV_DOWN) {spriteScroll += 0.05 * delta}
+	//	if (inputState.NAV_UP  ) {spriteScroll -= 0.05 * delta}
+	//	ctx.drawImage(sprites, 0, 0, 256, 256, 32, 32+spriteScroll, 256, 256)
+	//	printText("0 1 2 3 4 5 6 7 8 9 a b c d e f",36, 24+spriteScroll, 256, 8)
+	//	printText("0 1 2 3 4 5 6 7 8 9 a b c d e f",24, 36+spriteScroll, 8, 256)
+	//}
+    DevConsole.draw();
+	ctx.restore();
+	window.requestAnimationFrame(gameLoop);
+}
+</script></body></html>

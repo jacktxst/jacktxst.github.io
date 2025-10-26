@@ -1,0 +1,29 @@
+.ent create npc 46 0 0 16 16
+.ent focus 0
+.ent mod anim_frames 1
+.ent mod anim_step 16
+.ent mod anim_speed 0.004
+
+.ent create interact 0 0 16 16 ".exec frog_dialog"
+.ent focus 1
+
+.edit frog_dialog
+.ent focus 0
+.ent mod anim_frames 2
+.canmove 0
+.prevent interact
+.db new 40 70 120 20
+.db write "I am mr frog"
+.db mode menu
+.db cursor 0 1
+.db choice 0 0 0 0 frog_exit
+.db cursor 0 1
+.end
+
+.edit frog_exit
+.db delete
+.ent focus 0
+.ent mod anim_frames 1
+.canmove 1
+.allow interact
+.end
